@@ -4,7 +4,7 @@ on:
   push:
     # 當我們 push 到 main 分支時觸發
     branches: [ main ]
-
+  print("M")
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -29,7 +29,8 @@ jobs:
         run: |
           # 先執行基本測試
           pytest --cov=. --cov-report=term-missing
-
+    print("TEST ")
+    
   build-and-push-aws:
     name: Build and Push to Amazon ECR
     runs-on: ubuntu-latest
