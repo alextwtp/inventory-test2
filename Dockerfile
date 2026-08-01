@@ -1,24 +1,58 @@
-FROM python:3.12-slim
+name: GitHub Actions CI workflow
 
-# Set working directory inside container
-WORKDIR /app
+on:
+  push:
+    branches: [main, feature/fastapi-mysql]
+  pull_request:
+    branches: [main]
 
-# Copy dependency list first for better Docker cache usage
-COPY requirements.txt /tmp/requirements.txt
+jobs:
+  test:
+    runs-on: ubuntu-latest
 
-# Install Python packages
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
 
-# Copy project files into container
-COPY app ./app
-COPY config ./config
-COPY core ./core
-COPY repository ./repository
-COPY tests ./tests
-COPY pytest.ini .
-COPY api ./api
-COPY .coveragerc .
-COPY data ./data
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-# Start container with bash shell
-CMD ["bash"]
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=. --cov-report=term-missing --cov-fail-under=80
+
+  docker-build-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t alextwtpyeh/inventory-mysql:latest .
+
+      - name: Push Docker image
+        run: |
+          docker push alextwtpyeh/inventory-mysql:latest
