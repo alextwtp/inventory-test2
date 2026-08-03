@@ -111,3 +111,38 @@ def inventory_out(req: InventoryRequest, db: Session = Depends(get_db)) -> dict:
     except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from exc
+
+# =====================================================================
+# 新增：直接從遠端 Amazon RDS 查詢所有庫存紀錄的 API (方法 A)
+# =====================================================================
+@app.get("/inventory/list")
+def list_all_inventory(db: Session = Depends(get_db)) -> dict:
+    """
+    從遠端 Amazon RDS 資料庫直接撈出所有的庫存紀錄
+    """
+    try:
+        # 1. 直接向 RDS 撈取 inventory 資料表內的所有原始資料
+        items = db.query(Inventory).all()
+        
+        # 2. 將撈出來的資料轉換為乾淨的字典清單格式
+        formatted_items = []
+        for row in items:
+            formatted_items.append({
+                "id": row.id,
+                "pid": row.pid,
+                "item_name": row.item_name,
+                "qty": row.qty,
+                "receiver": row.receiver,
+                "shipper": row.shipper
+            })
+            
+        return {
+            "status": "success",
+            "message": "Successfully retrieved all records from RDS",
+            "total_records": len(formatted_items),
+            "data": formatted_items
+        }
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"RDS 數據庫讀取失敗: {str(exc)}")
+
